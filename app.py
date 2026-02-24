@@ -3,7 +3,7 @@ import re
 from collections import defaultdict
 
 # Hardcoded path to your PDF
-PDF_PATH = "path/to/your/book.pdf"
+PDF_PATH = "/content/drive/MyDrive/input.pdf"
 OUTPUT_PATH = "table_of_contents.txt"
 
 def get_baseline_font_size(doc):
