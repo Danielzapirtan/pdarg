@@ -22,9 +22,8 @@ def line_is_fully_bold(line):
 
     for span in spans:
         font_name = span["font"].lower()
-        is_bold_flag = span["flags"] & 8  # bold flag in PyMuPDF
-        if not is_bold_flag:
-            return False
+        is_bold_flag = span["flags"] & 16  # bold flag in PyMuPDF
+        return is_bold_flag
 
     return True
 
