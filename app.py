@@ -20,12 +20,13 @@ def line_is_fully_bold(line):
     if not spans:
         return False
 
-    cond = False
     for span in spans:
-        is_bold_flag = span["flags"] & 16  # bold flag in PyMuPDF
-        cond = cond or is_bold_flag
+        font_name = span["font"].lower()
+        is_bold_flag = span["flags"] & 2  # bold flag in PyMuPDF
+        if "bold" not in font_name and not is_bold_flag:
+            return False
 
-    return cond
+    return True
 
 
 def extract_bold_lines(pdf_path):
