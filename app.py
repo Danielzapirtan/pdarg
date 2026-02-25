@@ -41,6 +41,6 @@ if __name__ == "__main__":
     # Configuration
     INPUT_PDF = "/content/drive/MyDrive/input.pdf"
     OUTPUT_TXT = "/content/drive/MyDrive/extracted_text.txt"
-    THRESHOLD = 7.6
+    THRESHOLD = 8.0
     
     extract_large_text(INPUT_PDF, OUTPUT_TXT, THRESHOLD)
