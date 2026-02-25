@@ -86,13 +86,6 @@ def determine_font_hierarchy(font_sizes):
 # STEP 3 — Detect Chapter 1 start page
 # ------------------------------------------------------------
 
-def detect_chapter1_page(elements):
-    for el in elements:
-        if re.match(r"^1$", el["text"], re.IGNORECASE):
-            return el["page"]
-    return 1
-
-
 # ------------------------------------------------------------
 # STEP 4 — Detect headings cleanly
 # ------------------------------------------------------------
@@ -177,7 +170,7 @@ def main():
 
     body_size, heading_sizes = determine_font_hierarchy(font_sizes)
 
-    start_page = detect_chapter1_page(elements)
+    start_page = 22
 
     headings = detect_headings(
         elements,
