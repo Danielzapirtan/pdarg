@@ -25,7 +25,7 @@ def line_is_fully_bold(line):
         font_name = span.get("font", "").lower()  # Added .get() for safety
         # Fixed: Check if flags exists and is an integer
         flags = span.get("flags", 0)
-        is_bold_flag = bool(flags & 2)  # bold flag in PyMuPDF
+        is_bold_flag = bool(flags & 18)  # bold flag in PyMuPDF
         
         if "bold" not in font_name and not is_bold_flag:
             return False
