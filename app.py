@@ -51,14 +51,14 @@ def infer_level(text: str) -> int:
     if re.match(rf"^\s*{ROMAN_RE}\.?\s+", t):
         return 1
 
-    if re.match(r"^\s*\d+\s+", t):
-        return 1
+    if re.match(r"^\s*\d+\.\d+\.\d+\s+", t):
+        return 3
 
     if re.match(r"^\s*\d+\.\d+\s+", t):
         return 2
 
-    if re.match(r"^\s*\d+\.\d+\.\d+\s+", t):
-        return 3
+    if re.match(r"^\s*\d+\s+", t):
+        return 1
 
     if re.match(rf"^\s*{CHAPTER_KEYWORDS}\b", t, re.IGNORECASE):
         return 1
@@ -102,36 +102,43 @@ def extract_toc_from_text(pdf_path: Path):
         page = doc.load_page(page_index)
         blocks = page.get_text("blocks")
 
+        lines_in_reading_order = []
+
         for block in blocks:
             text = normalize(block[4])
             if not text:
                 continue
 
-            lines = text.split("\n")
-
-            for line in lines:
+            for line in text.split("\n"):
                 candidate = normalize(line)
-                if not candidate:
-                    continue
+                if candidate:
+                    lines_in_reading_order.append(candidate)
 
-                if not is_heading_candidate(candidate):
-                    continue
+        if not lines_in_reading_order:
+            continue
 
-                level = infer_level(candidate)
+        # Omit page header (assumed first line of page)
+        content_lines = lines_in_reading_order[1:]
 
-                pair_key = (level, candidate.lower())
-                if pair_key in seen_pairs:
-                    continue
+        for candidate in content_lines:
+            if not is_heading_candidate(candidate):
+                continue
 
-                seen_pairs.add(pair_key)
+            level = infer_level(candidate)
+            pair_key = (level, candidate.lower())
 
-                flat_entries.append(
-                    {
-                        "level": level,
-                        "title": candidate,
-                        "page": page_index + 1,
-                    }
-                )
+            if pair_key in seen_pairs:
+                continue
+
+            seen_pairs.add(pair_key)
+
+            flat_entries.append(
+                {
+                    "level": level,
+                    "title": candidate,
+                    "page": page_index + 1,
+                }
+            )
 
     doc.close()
 
