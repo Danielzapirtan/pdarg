@@ -1,5 +1,6 @@
 import fitz  # PyMuPDF
 import os
+import re
 
 # Configuration
 INPUT_PATH = "/content/drive/MyDrive/input.pdf"
@@ -7,38 +8,34 @@ OUTPUT_PATH = "/content/drive/MyDrive/output.txt"
 
 def line_is_fully_bold(line):
     """
-    A line is considered fully bold if every non-whitespace span 
-    matches bold, heavy, black, semibold, or demi keywords/flags.
+    Improved detection using flags, common bold suffixes, 
+    and CSS-style weight numbers (e.g., W600, Black, etc.)
     """
-    # 1. Extract only spans that contain actual text (ignoring whitespace)
     spans = [s for s in line.get("spans", []) if s.get("text", "").strip()]
-
     if not spans:
         return False
 
-    # 2. Strong weight keywords used in professional typography
-    bold_keywords = ["bold", "heavy", "black", "semibold", "demi", "medium"]
+    # Expanded list: 'w6', 'w7', 'w8', 'w9' catch numerical weights like W600-W900
+    bold_patterns = ["bold", "heavy", "black", "semibold", "demi", "medium", "w6", "w7", "w8", "w9"]
 
     for span in spans:
         font_name = span.get("font", "").lower()
         flags = span.get("flags", 0)
         
-        # PyMuPDF Bold Flag is bit 4 (value 16)
+        # 1. Standard PDF Bold Flag (Bit 4)
         is_bold_flag = bool(flags & 16)
         
-        # Check if any keyword exists in the font name string
-        has_bold_name = any(word in font_name for word in bold_keywords)
+        # 2. Keyword/Weight Pattern check
+        has_bold_name = any(word in font_name for word in bold_patterns)
         
-        # If the span isn't bold by name OR by flag, the whole line fails
+        # 3. Specific check for fonts named like "Arial-BoldMT" or "Inter-SemiBold"
+        # Often the hyphenated suffix is the only indicator
         if not (has_bold_name or is_bold_flag):
             return False
 
     return True
 
 def extract_bold_lines_with_pages(pdf_path):
-    """
-    Iterates through the PDF and returns a list of (page_num, text) tuples.
-    """
     if not os.path.exists(pdf_path):
         print(f"Error: File not found at {pdf_path}")
         return []
@@ -53,44 +50,47 @@ def extract_bold_lines_with_pages(pdf_path):
 
     for page in doc:
         page_dict = page.get_text("dict")
-        page_num = page.number + 1  # 1-indexed for readability
+        page_num = page.number + 1
         
         for block in page_dict.get("blocks", []):
-            if block.get("type") != 0:  # Only process text blocks
+            if block.get("type") != 0:
                 continue
 
             for line in block.get("lines", []):
                 if line_is_fully_bold(line):
-                    # Reconstruct the full text of the line
                     line_text = "".join(s.get("text", "") for s in line.get("spans", [])).strip()
                     if line_text:
                         results.append((page_num, line_text))
+                
+                # --- OPTIONAL DEBUGGING ---
+                # Uncomment the lines below if it still finds nothing 
+                # to see what your PDF fonts are actually named:
+                # else:
+                #    for s in line.get("spans", []):
+                #        if s.get("text", "").strip():
+                #            print(f"DEBUG: Text '{s['text'][:10]}' has font '{s['font']}'")
 
     doc.close()
     return results
 
 def main():
-    print(f"Starting extraction from: {INPUT_PATH}")
+    print(f"Analyzing PDF: {INPUT_PATH}...")
     bold_data = extract_bold_lines_with_pages(INPUT_PATH)
     
     if not bold_data:
-        print("No bold headings detected. Check your PDF formatting or file path.")
+        print("\n[!] No bold headings found.")
+        print("Try uncommenting the DEBUG lines in extract_bold_lines_with_pages to see font names.")
         return
 
-    # Ensure output directory exists
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 
-    try:
-        with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
-            f.write(f"{'PAGE':<8} | {'HEADING'}\n")
-            f.write("-" * 50 + "\n")
-            for page_num, text in bold_data:
-                # Format as a clean Table of Contents
-                f.write(f"Page {page_num:<3} | {text}\n")
-        
-        print(f"Success! Extracted {len(bold_data)} headings to {OUTPUT_PATH}")
-    except Exception as e:
-        print(f"Error writing to file: {e}")
+    with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+        f.write(f"{'PAGE':<8} | {'HEADING'}\n")
+        f.write("-" * 60 + "\n")
+        for page_num, text in bold_data:
+            f.write(f"Page {page_num:<3} | {text}\n")
+    
+    print(f"Success! {len(bold_data)} headings saved to {OUTPUT_PATH}")
 
 if __name__ == "__main__":
     main()
