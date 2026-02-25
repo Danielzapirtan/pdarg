@@ -1,33 +1,28 @@
-import os
-import math
-from collections import defaultdict, Counter
-from pathlib import Path
-
+import re
+from collections import Counter
 import fitz  # PyMuPDF
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import ListFlowable, ListItem
-from reportlab.lib import colors
 from PyPDF2 import PdfReader, PdfWriter
-
 
 INPUT_PDF = "/content/drive/MyDrive/input.pdf"
 TEMP_TOC = "generated_toc.pdf"
-OUTPUT_PDF = "/content/drive/MyDrive/output_with_contents.pdf"
+OUTPUT_PDF = "output_with_contents.pdf"
 
 
 # ------------------------------------------------------------
-# STEP 1 — Extract font statistics and text blocks
+# STEP 1 — Extract clean text lines (robust merging)
 # ------------------------------------------------------------
 
-def extract_text_elements(pdf_path):
+def extract_clean_lines(pdf_path):
     doc = fitz.open(pdf_path)
 
     elements = []
     font_sizes = []
 
     for page_index, page in enumerate(doc):
+        page_width = page.rect.width
         blocks = page.get_text("dict")["blocks"]
 
         for block in blocks:
@@ -35,23 +30,35 @@ def extract_text_elements(pdf_path):
                 continue
 
             for line in block["lines"]:
+
                 line_text = ""
                 sizes = []
+                x_positions = []
 
                 for span in line["spans"]:
                     line_text += span["text"]
                     sizes.append(span["size"])
+                    x_positions.append(span["bbox"][0])
 
                 clean = line_text.strip()
+
                 if not clean:
                     continue
 
-                avg_size = sum(sizes) / len(sizes)
-                font_sizes.append(round(avg_size, 1))
+                # Ignore tiny fragments
+                if len(clean) < 3:
+                    continue
+
+                # Ignore right margin artifacts (page numbers etc.)
+                if min(x_positions) > page_width * 0.8:
+                    continue
+
+                avg_size = round(sum(sizes) / len(sizes), 1)
+                font_sizes.append(avg_size)
 
                 elements.append({
                     "text": clean,
-                    "size": round(avg_size, 1),
+                    "size": avg_size,
                     "page": page_index + 1
                 })
 
@@ -60,21 +67,15 @@ def extract_text_elements(pdf_path):
 
 
 # ------------------------------------------------------------
-# STEP 2 — Infer body font size and heading levels
+# STEP 2 — Detect body font & heading hierarchy
 # ------------------------------------------------------------
 
 def determine_font_hierarchy(font_sizes):
-    """
-    Determine body size and heading levels automatically.
-    """
-    size_counts = Counter(font_sizes)
+    counts = Counter(font_sizes)
+    body_size = counts.most_common(1)[0][0]
 
-    # Body font = most frequent size
-    body_size = size_counts.most_common(1)[0][0]
-
-    # Heading sizes = larger than body
     heading_sizes = sorted(
-        [size for size in size_counts if size > body_size],
+        [size for size in counts if size > body_size],
         reverse=True
     )
 
@@ -82,29 +83,46 @@ def determine_font_hierarchy(font_sizes):
 
 
 # ------------------------------------------------------------
-# STEP 3 — Extract headings automatically
+# STEP 3 — Detect Chapter 1 start page
 # ------------------------------------------------------------
 
-def detect_headings(elements, body_size, heading_sizes):
+def detect_chapter1_page(elements):
+    for el in elements:
+        if re.match(r"^chapter\s+1\b", el["text"], re.IGNORECASE):
+            return el["page"]
+    return 1
+
+
+# ------------------------------------------------------------
+# STEP 4 — Detect headings cleanly
+# ------------------------------------------------------------
+
+def detect_headings(elements, body_size, heading_sizes, start_page):
     headings = []
 
     for el in elements:
+        if el["page"] < start_page:
+            continue
+
         if el["size"] in heading_sizes:
+
+            # Avoid long paragraph misclassification
+            if len(el["text"]) > 200:
+                continue
+
             level = heading_sizes.index(el["size"]) + 1
 
-            # Filter noise: avoid long paragraphs
-            if len(el["text"]) < 200:
-                headings.append({
-                    "level": level,
-                    "text": el["text"],
-                    "page": el["page"]
-                })
+            headings.append({
+                "level": level,
+                "text": el["text"],
+                "page": el["page"]
+            })
 
     return headings
 
 
 # ------------------------------------------------------------
-# STEP 4 — Build TOC PDF
+# STEP 5 — Build TOC PDF
 # ------------------------------------------------------------
 
 def build_toc_pdf(headings):
@@ -114,8 +132,6 @@ def build_toc_pdf(headings):
 
     elements.append(Paragraph("<b>Contents</b>", styles["Heading1"]))
     elements.append(Spacer(1, 0.4 * inch))
-
-    max_level = max(h["level"] for h in headings) if headings else 1
 
     for h in headings:
         indent = 20 * (h["level"] - 1)
@@ -134,7 +150,7 @@ def build_toc_pdf(headings):
 
 
 # ------------------------------------------------------------
-# STEP 5 — Prepend TOC to original PDF
+# STEP 6 — Prepend TOC
 # ------------------------------------------------------------
 
 def prepend_toc(original_pdf, toc_pdf, output_pdf):
@@ -142,11 +158,9 @@ def prepend_toc(original_pdf, toc_pdf, output_pdf):
     reader_toc = PdfReader(toc_pdf)
     writer = PdfWriter()
 
-    # Add TOC pages first
     for page in reader_toc.pages:
         writer.add_page(page)
 
-    # Add original PDF pages
     for page in reader_original.pages:
         writer.add_page(page)
 
@@ -155,23 +169,31 @@ def prepend_toc(original_pdf, toc_pdf, output_pdf):
 
 
 # ------------------------------------------------------------
-# MAIN EXECUTION
+# MAIN
 # ------------------------------------------------------------
 
 def main():
-    elements, font_sizes = extract_text_elements(INPUT_PDF)
+    elements, font_sizes = extract_clean_lines(INPUT_PDF)
 
     body_size, heading_sizes = determine_font_hierarchy(font_sizes)
 
-    headings = detect_headings(elements, body_size, heading_sizes)
+    start_page = detect_chapter1_page(elements)
+
+    headings = detect_headings(
+        elements,
+        body_size,
+        heading_sizes,
+        start_page
+    )
 
     build_toc_pdf(headings)
 
     prepend_toc(INPUT_PDF, TEMP_TOC, OUTPUT_PDF)
 
     print("Done.")
-    print(f"Body font size detected: {body_size}")
-    print(f"Heading levels detected: {heading_sizes}")
+    print(f"Body font size: {body_size}")
+    print(f"Heading levels: {heading_sizes}")
+    print(f"Chapter 1 starts at page: {start_page}")
     print(f"Output file: {OUTPUT_PDF}")
 
 
