@@ -8,7 +8,7 @@ from PyPDF2 import PdfReader, PdfWriter
 
 INPUT_PDF = "/content/drive/MyDrive/input.pdf"
 TEMP_TOC = "generated_toc.pdf"
-OUTPUT_PDF = "output_with_contents.pdf"
+OUTPUT_PDF = "/content/drive/MyDrive/output_with_contents.pdf"
 
 
 # ------------------------------------------------------------
