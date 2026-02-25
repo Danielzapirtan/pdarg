@@ -1,6 +1,6 @@
 import fitz  # PyMuPDF
 
-def extract_large_text(input_path, output_path, min_font_size=20):
+def extract_large_text(input_path, output_path, min_font_size=7.5):
     """
     Extracts text spans from a PDF that exceed a specific font size.
     """
@@ -41,6 +41,6 @@ if __name__ == "__main__":
     # Configuration
     INPUT_PDF = "/content/drive/MyDrive/input.pdf"
     OUTPUT_TXT = "/content/drive/MyDrive/extracted_text.txt"
-    THRESHOLD = 7.5
+    THRESHOLD = 7.6
     
     extract_large_text(INPUT_PDF, OUTPUT_TXT, THRESHOLD)
