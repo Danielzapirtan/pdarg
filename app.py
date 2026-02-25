@@ -22,6 +22,8 @@ def extract_clean_lines(pdf_path):
     font_sizes = []
 
     for page_index, page in enumerate(doc):
+        if page_index < 22:
+            continue
         page_width = page.rect.width
         blocks = page.get_text("dict")["blocks"]
 
