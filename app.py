@@ -1,7 +1,3 @@
-import json
-import re
-from pathlib import Path
-
 import fitz  # PyMuPDF
 
 
@@ -21,6 +17,51 @@ CHAPTER_KEYWORDS = (
 def normalize(text: str) -> str:
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+
+def collapse_spaced_letters(text: str) -> str:
+    """
+    Converts patterns like:
+        'h o r s e' -> 'horse'
+        'H O R S E' -> 'HORSE'
+    Only collapses sequences of >=3 single-letter tokens.
+    """
+    tokens = text.split()
+    result = []
+    i = 0
+
+    while i < len(tokens):
+        if len(tokens[i]) == 1 and tokens[i].isalpha():
+            j = i
+            while j < len(tokens) and len(tokens[j]) == 1 and tokens[j].isalpha():
+                j += 1
+
+            if j - i >= 3:
+                result.append("".join(tokens[i:j]))
+                i = j
+                continue
+
+        result.append(tokens[i])
+        i += 1
+
+    return " ".join(result)
+
+
+def clean_text(text: str) -> str:
+    text = normalize(text)
+    text = collapse_spaced_letters(text)
+    return text
+
+
+def is_index_line(text: str) -> bool:
+    t = text.strip()
+    if not t:
+        return False
+    if re.fullmatch(r"\d+", t):
+        return True
+    if re.fullmatch(rf"{ROMAN_RE}", t, re.IGNORECASE):
+        return True
+    return False
 
 
 def is_heading_candidate(text: str) -> bool:
@@ -66,33 +107,7 @@ def infer_level(text: str) -> int:
     return 2
 
 
-def build_hierarchical_toc(flat_entries):
-    root = []
-    stack = []
-
-    for entry in flat_entries:
-        node = {
-            "title": entry["title"],
-            "page": entry["page"],
-            "children": [],
-        }
-
-        level = entry["level"]
-
-        while stack and stack[-1]["level"] >= level:
-            stack.pop()
-
-        if not stack:
-            root.append(node)
-        else:
-            stack[-1]["node"]["children"].append(node)
-
-        stack.append({"level": level, "node": node})
-
-    return root
-
-
-def extract_toc_from_text(pdf_path: Path):
+def extract_flat_toc(pdf_path: Path):
     doc = fitz.open(pdf_path)
 
     flat_entries = []
@@ -102,23 +117,26 @@ def extract_toc_from_text(pdf_path: Path):
         page = doc.load_page(page_index)
         blocks = page.get_text("blocks")
 
-        lines_in_reading_order = []
+        lines_in_order = []
 
         for block in blocks:
-            text = normalize(block[4])
+            text = clean_text(block[4])
             if not text:
                 continue
-
             for line in text.split("\n"):
-                candidate = normalize(line)
+                candidate = clean_text(line)
                 if candidate:
-                    lines_in_reading_order.append(candidate)
+                    lines_in_order.append(candidate)
 
-        if not lines_in_reading_order:
+        if not lines_in_order:
             continue
 
-        # Omit page header (assumed first line of page)
-        content_lines = lines_in_reading_order[1:]
+        # omit first line (page header)
+        content_lines = lines_in_order[1:]
+
+        # omit last line if it is page index
+        if content_lines and is_index_line(content_lines[-1]):
+            content_lines = content_lines[:-1]
 
         for candidate in content_lines:
             if not is_heading_candidate(candidate):
@@ -134,7 +152,7 @@ def extract_toc_from_text(pdf_path: Path):
 
             flat_entries.append(
                 {
-                    "level": level,
+                    "rank": level,
                     "title": candidate,
                     "page": page_index + 1,
                 }
@@ -142,21 +160,56 @@ def extract_toc_from_text(pdf_path: Path):
 
     doc.close()
 
-    flat_entries.sort(key=lambda x: (x["page"], x["level"]))
+    flat_entries.sort(key=lambda x: (x["page"], x["rank"]))
     return flat_entries
+
+
+def build_structured_toc(flat_entries):
+    structured = []
+    stack = []
+    element_counter = 1
+
+    for entry in flat_entries:
+        rank = entry["rank"]
+
+        while stack and stack[-1]["rank"] >= rank:
+            stack.pop()
+
+        parent_element = stack[-1]["element"] if stack else None
+
+        node = {
+            "element": element_counter,
+            "parent": parent_element,
+            "rank": rank,
+            "title": entry["title"],
+            "page": entry["page"],
+        }
+
+        structured.append(node)
+
+        stack.append(
+            {
+                "rank": rank,
+                "element": element_counter,
+            }
+        )
+
+        element_counter += 1
+
+    return structured
 
 
 def main():
     if not INPUT_PATH.exists():
         raise FileNotFoundError(f"Input PDF not found: {INPUT_PATH}")
 
-    flat_toc = extract_toc_from_text(INPUT_PATH)
-    hierarchical_toc = build_hierarchical_toc(flat_toc)
+    flat_toc = extract_flat_toc(INPUT_PATH)
+    structured_toc = build_structured_toc(flat_toc)
 
     book_structure = {
         "file": str(INPUT_PATH),
-        "total_entries": len(flat_toc),
-        "toc": hierarchical_toc,
+        "total_elements": len(structured_toc),
+        "toc": structured_toc,
     }
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
