@@ -66,10 +66,36 @@ def infer_level(text: str) -> int:
     return 2
 
 
+def build_hierarchical_toc(flat_entries):
+    root = []
+    stack = []
+
+    for entry in flat_entries:
+        node = {
+            "title": entry["title"],
+            "page": entry["page"],
+            "children": [],
+        }
+
+        level = entry["level"]
+
+        while stack and stack[-1]["level"] >= level:
+            stack.pop()
+
+        if not stack:
+            root.append(node)
+        else:
+            stack[-1]["node"]["children"].append(node)
+
+        stack.append({"level": level, "node": node})
+
+    return root
+
+
 def extract_toc_from_text(pdf_path: Path):
     doc = fitz.open(pdf_path)
 
-    entries = []
+    flat_entries = []
     seen_pairs = set()
 
     for page_index in range(len(doc)):
@@ -99,7 +125,7 @@ def extract_toc_from_text(pdf_path: Path):
 
                 seen_pairs.add(pair_key)
 
-                entries.append(
+                flat_entries.append(
                     {
                         "level": level,
                         "title": candidate,
@@ -109,20 +135,27 @@ def extract_toc_from_text(pdf_path: Path):
 
     doc.close()
 
-    entries.sort(key=lambda x: (x["page"], x["level"]))
-    return entries
+    flat_entries.sort(key=lambda x: (x["page"], x["level"]))
+    return flat_entries
 
 
 def main():
     if not INPUT_PATH.exists():
         raise FileNotFoundError(f"Input PDF not found: {INPUT_PATH}")
 
-    toc_data = extract_toc_from_text(INPUT_PATH)
+    flat_toc = extract_toc_from_text(INPUT_PATH)
+    hierarchical_toc = build_hierarchical_toc(flat_toc)
+
+    book_structure = {
+        "file": str(INPUT_PATH),
+        "total_entries": len(flat_toc),
+        "toc": hierarchical_toc,
+    }
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
-        json.dump(toc_data, f, ensure_ascii=False, indent=2)
+        json.dump(book_structure, f, ensure_ascii=False, indent=2)
 
 
 if __name__ == "__main__":
