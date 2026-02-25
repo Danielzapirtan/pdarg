@@ -88,7 +88,7 @@ def determine_font_hierarchy(font_sizes):
 
 def detect_chapter1_page(elements):
     for el in elements:
-        if re.match(r"^chapter\s+1\b", el["text"], re.IGNORECASE):
+        if re.match(r"^1$", el["text"], re.IGNORECASE):
             return el["page"]
     return 1
 
