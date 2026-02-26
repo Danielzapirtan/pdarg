@@ -32,8 +32,7 @@ jobs:
         env:
           FILE_ID: ${{ secrets.GDRIVE_FILE_ID }}
         run: |
-          curl -c cookies.txt -L \
-            "https://drive.google.com/uc?export=download&id=$FILE_ID" > response.html
+          curl -c cookies.txt -L "https://drive.google.com/uc?export=download&id=$FILE_ID" > response.html
 
           CONFIRM=$(grep -o 'confirm=[^&]*' response.html | head -n 1 | cut -d '=' -f2)
 
