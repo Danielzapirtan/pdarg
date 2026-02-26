@@ -1,3 +1,5 @@
 pymupdf
 reportlab
 PyPDF2
+pillow
+pytesseract
