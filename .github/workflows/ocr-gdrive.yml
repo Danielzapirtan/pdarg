@@ -36,9 +36,7 @@ jobs:
 
           CONFIRM=$(grep -o 'confirm=[^&]*' response.html | head -n 1 | cut -d '=' -f2)
 
-          curl -Lb cookies.txt \
-            "https://drive.google.com/uc?export=download&confirm=$CONFIRM&id=$FILE_ID" \
-            -o input.pdf
+          curl -Lb cookies.txt "https://drive.google.com/uc?export=download&confirm=$CONFIRM&id=$FILE_ID" -o input.pdf
 
       - name: Run OCR
         run: python app.py
