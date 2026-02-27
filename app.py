@@ -626,7 +626,7 @@ if __name__ == "__main__":
         output_file = "/content/drive/MyDrive/" + Path(pdf_file).stem + "_toc.md"
         with open(output_file, 'w') as f:
             f.write(result.to_markdown())
-        print(f"\nSaved JSON to: {output_file}")
+        print(f"\nSaved markdown to: {output_file}")
         
         # Example with custom parameters
         print("\n" + "=" * 50)
