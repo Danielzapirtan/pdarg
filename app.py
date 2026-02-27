@@ -132,9 +132,9 @@ class PDFTOCExtractor:
         methods = [
             self._extract_native_toc,
             self._extract_via_outline,
+            self._extract_via_ml
             self._extract_via_text_analysis,
             self._extract_via_layout_analysis,
-            self._extract_via_ml
         ]
         
         best_result = None
