@@ -622,8 +622,8 @@ if __name__ == "__main__":
         print("\nExtracted TOC:")
         print(result.to_markdown())
         
-        # Save as JSON
-        output_file = Path(pdf_file) + "_toc.md"
+        # Save as markdown
+        output_file = "/content/drive/MyDrive/" + Path(pdf_file).stem + "_toc.md"
         with open(output_file, 'w') as f:
             f.write(result.to_markdown())
         print(f"\nSaved JSON to: {output_file}")
