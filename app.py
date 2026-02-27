@@ -623,9 +623,9 @@ if __name__ == "__main__":
         print(result.to_markdown())
         
         # Save as JSON
-        output_file = Path(pdf_file).stem + "_toc.json"
+        output_file = Path(pdf_file) + "_toc.md"
         with open(output_file, 'w') as f:
-            f.write(result.to_json())
+            f.write(result.to_markdown())
         print(f"\nSaved JSON to: {output_file}")
         
         # Example with custom parameters
