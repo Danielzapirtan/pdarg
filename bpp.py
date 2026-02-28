@@ -1,61 +1,59 @@
 import pytesseract
 from pdf2image import convert_from_path
-from PIL import Image, ImageEnhance
+from PIL import Image
 
-def extract_bold_from_pixels(pdf_path):
-    # 1. Convert PDF to high-res images (300-600 DPI is best for pixelated text)
-    pages = convert_from_path(pdf_path, dpi=300)
+def extract_bold_from_scan(pdf_path):
+    # 1. Convert PDF to images. 
+    # Use a slightly lower DPI (200) if Termux crashes due to RAM limits.
+    pages = convert_from_path(pdf_path, dpi=200)
     
-    extracted_report = []
+    extracted_lines = []
 
     for page in pages:
-        # 2. Pre-process: Increase contrast to make bold stand out
-        enhancer = ImageEnhance.Contrast(page)
-        processed_page = enhancer.enhance(2.0) # Double the contrast
-        
-        # 3. Get OCR data with 'config' to help detect styles
-        # We use 'config' to tell Tesseract to look for hOCR attributes
-        data = pytesseract.image_to_data(processed_page, output_type=pytesseract.Output.DICT)
+        # 2. Use Tesseract to get detailed word data
+        # We use 'config' to improve orientation and script detection (OSD)
+        data = pytesseract.image_to_data(page, output_type=pytesseract.Output.DICT)
         
         n_boxes = len(data['text'])
-        line_map = {} # Groups text by their vertical position (y-coordinate)
+        current_line_text = []
+        current_line_heights = []
+        last_line_num = -1
+        is_bold_line = False
 
         for i in range(n_boxes):
             text = data['text'][i].strip()
-            if not text:
-                continue
-
-            # In image-based PDFs, 'top' coordinate defines the line
-            y_pos = data['top'][i]
-            # Group by approximate Y-coordinate (tolerance of 10 pixels)
-            line_key = y_pos // 10 
+            if not text: continue
             
-            if line_key not in line_map:
-                line_map[line_key] = {'text': [], 'heights': [], 'is_bold': False}
+            line_num = data['line_num'][i]
 
-            # Tesseract's 'weight' or 'bold' detection in image_to_data
-            # Note: This depends on the Tesseract version and 'config'
-            if 'bold' in data and data['bold'][i] == 1:
-                line_map[line_key]['is_bold'] = True
-            
-            # Fallback: If Tesseract doesn't flag it, we check the stroke height
-            # Bold letters often have a slightly different height/width ratio
-            line_map[line_key]['text'].append(text)
-            line_map[line_key]['heights'].append(data['height'][i])
-
-        # 4. Filter for lines that are significantly taller/bold
-        for key in sorted(line_map.keys()):
-            line_data = line_map[key]
-            # Heuristic: If Tesseract flagged it OR text is unusually large
-            if line_data['is_bold'] or max(line_data['heights']) > 25: 
-                avg_height = sum(line_data['heights']) / len(line_data['heights'])
-                # Convert pixel height to approximate font size (px * 0.72)
-                font_size = round(avg_height * 0.72, 1)
+            # If we hit a new line, process the previous one
+            if line_num != last_line_num:
+                if current_line_text and is_bold_line:
+                    avg_h = sum(current_line_heights) / len(current_line_heights)
+                    # Convert pixel height to approximate font size
+                    font_size = round(avg_h * 0.72, 1) 
+                    extracted_lines.append(f"<{font_size}> {' '.join(current_line_text)}")
                 
-                content = " ".join(line_data['text'])
-                extracted_report.append(f"<{font_size}> {content}")
+                # Reset for new line
+                current_line_text = []
+                current_line_heights = []
+                is_bold_line = False
+            
+            # Tesseract 4+ identifies bolding by looking at pixel density
+            # If the 'bold' attribute is 1, we flag the whole line
+            if int(data.get('bold', [0]*n_boxes)[i]) == 1:
+                is_bold_line = True
+            
+            # Alternative: Detection via 'font_name' strings containing 'Bold'
+            font_info = data.get('font_name', [""]*n_boxes)[i]
+            if "bold" in font_info.lower():
+                is_bold_line = True
 
-    return extracted_report
+            current_line_text.append(text)
+            current_line_heights.append(data['height'][i])
+            last_line_num = line_num
 
-# Usage
-# report = extract_bold_from_pixels("my_scanned_file.pdf")
+    return extracted_lines
+
+# Example Execution
+# print("\n".join(extract_bold_from_scan("your_file.pdf")))
