@@ -1,7 +1,7 @@
-from dedoc import Dedoc
+from dedoc.readers import PdfBaseReader
 
 # Initialize the reader
-reader = Dedoc()
+reader = PdfBaseReader()
 
 # Extract structured document
 result = reader.extract(file_path="/content/drive/MyDrive/input.pdf")
