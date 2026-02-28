@@ -274,14 +274,14 @@ class PDFTOCExtractor:
             # Look for TOC pages (usually in first few pages)
             toc_pages = []
             toc_patterns = [
-                r'contents?',
+                r'contents',
                 r'table\s+of\s+contents?',
                 r'index',
                 r'summary'
             ]
             
             # Find TOC pages
-            for i, page in enumerate(pdf.pages[10:18]):  # Check first 20 pages
+            for i, page in enumerate(pdf.pages[:20]):  # Check first 20 pages
                 text = page.extract_text() or ""
                 text_lower = text.lower()
                 
