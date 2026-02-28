@@ -1,4 +1,4 @@
-from dedoc import Dedoc
+from dedoc.dedoc import Dedoc
 
 # Initialize the reader
 reader = Dedoc()
