@@ -281,7 +281,7 @@ class PDFTOCExtractor:
             ]
             
             # Find TOC pages
-            for i, page in enumerate(pdf.pages[:20]):  # Check first 20 pages
+            for i, page in enumerate(pdf.pages[10:18]):  # Check first 20 pages
                 text = page.extract_text() or ""
                 text_lower = text.lower()
                 
@@ -301,7 +301,7 @@ class PDFTOCExtractor:
                 lines = self._group_words_into_lines(words)
                 
                 for line in lines:
-                    entry = self._parse_toc_line(line, page_num)
+                    entry = self._parse_toc_line(line, page_num + 1)
                     if entry:
                         entries.append(entry)
         
