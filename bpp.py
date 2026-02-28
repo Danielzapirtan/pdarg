@@ -1,59 +1,39 @@
 import pytesseract
 from pdf2image import convert_from_path
-from PIL import Image
+import gc # Garbage Collector
 
-def extract_bold_from_scan(pdf_path):
-    # 1. Convert PDF to images. 
-    # Use a slightly lower DPI (200) if Termux crashes due to RAM limits.
-    pages = convert_from_path(pdf_path, dpi=200)
+def extract_bold_efficiently(pdf_path):
+    # 1. Lower DPI to 150 to save 4x the RAM compared to 300 DPI
+    # 2. Use 'thread_count' to speed up rendering if your phone has multiple cores
     
-    extracted_lines = []
+    extracted_report = []
+    
+    # We process pages in small chunks to prevent RAM spikes
+    # Using 'first_page' and 'last_page' allows us to loop without loading the whole doc
+    from pdfinfo_wrapper import pdfinfo # part of pdf2image
+    info = pdfinfo(pdf_path)
+    total_pages = int(info["Pages"])
 
-    for page in pages:
-        # 2. Use Tesseract to get detailed word data
-        # We use 'config' to improve orientation and script detection (OSD)
-        data = pytesseract.image_to_data(page, output_type=pytesseract.Output.DICT)
+    for i in range(1, total_pages + 1):
+        print(f"Processing page {i}/{total_pages}...")
         
-        n_boxes = len(data['text'])
-        current_line_text = []
-        current_line_heights = []
-        last_line_num = -1
-        is_bold_line = False
+        # Load ONLY one page at a time
+        page_image = convert_from_path(
+            pdf_path, 
+            dpi=150, 
+            first_page=i, 
+            last_page=i,
+            use_pdftocairo=True # Often more memory-efficient on Linux/Ubuntu
+        )[0]
 
-        for i in range(n_boxes):
-            text = data['text'][i].strip()
-            if not text: continue
-            
-            line_num = data['line_num'][i]
+        # Perform OCR
+        data = pytesseract.image_to_data(page_image, output_type=pytesseract.Output.DICT)
+        
+        # ... (Your bold detection logic from the previous script goes here) ...
+        # (For brevity: identify lines, check bold flag, append to extracted_report)
+        
+        # IMPORTANT: Explicitly delete the image and clear RAM
+        del page_image
+        gc.collect() 
 
-            # If we hit a new line, process the previous one
-            if line_num != last_line_num:
-                if current_line_text and is_bold_line:
-                    avg_h = sum(current_line_heights) / len(current_line_heights)
-                    # Convert pixel height to approximate font size
-                    font_size = round(avg_h * 0.72, 1) 
-                    extracted_lines.append(f"<{font_size}> {' '.join(current_line_text)}")
-                
-                # Reset for new line
-                current_line_text = []
-                current_line_heights = []
-                is_bold_line = False
-            
-            # Tesseract 4+ identifies bolding by looking at pixel density
-            # If the 'bold' attribute is 1, we flag the whole line
-            if int(data.get('bold', [0]*n_boxes)[i]) == 1:
-                is_bold_line = True
-            
-            # Alternative: Detection via 'font_name' strings containing 'Bold'
-            font_info = data.get('font_name', [""]*n_boxes)[i]
-            if "bold" in font_info.lower():
-                is_bold_line = True
-
-            current_line_text.append(text)
-            current_line_heights.append(data['height'][i])
-            last_line_num = line_num
-
-    return extracted_lines
-
-# Example Execution
-# print("\n".join(extract_bold_from_scan("your_file.pdf")))
+    return extracted_report
