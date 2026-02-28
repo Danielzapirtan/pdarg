@@ -1,9 +1,6 @@
-# Core requirements
-PyPDF2>=3.0.0
-#pdfplumber>=0.10.0  # Optional but recommended
-#PyMuPDF>=1.23.0     # Optional but recommended
-
-# For ML-based extraction (optional)
-#numpy>=1.24.0
-#scikit-learn>=1.3.0
-dedoc[torch]
+pypdfium2>=4.30.0
+click>=8.1.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+scikit-learn>=1.0.0
+pdftext
