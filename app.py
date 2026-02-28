@@ -301,7 +301,7 @@ class PDFTOCExtractor:
                 lines = self._group_words_into_lines(words)
                 
                 for line in lines:
-                    entry = self._parse_toc_line(line, page_num + 1)
+                    entry = self._parse_toc_line(line, page_num)
                     if entry:
                         entries.append(entry)
         
