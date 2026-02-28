@@ -274,7 +274,7 @@ class PDFTOCExtractor:
             # Look for TOC pages (usually in first few pages)
             toc_pages = []
             toc_patterns = [
-                r'contents',
+                r'contents?',
                 r'table\s+of\s+contents?',
                 r'index',
                 r'summary'
